@@ -1,183 +1,51 @@
 'use client';
 
-// import { db } from '@/firebase';
-// import { collection, getDocs } from 'firebase/firestore';
-// import Image from 'next/image';
-// import { useEffect } from 'react';
-
-// const Events = () => {
-//    const trades = [
-//       {
-//          address: '0x3B553...87676',
-//          trades: '13 trades',
-//          time: '3 hours ago',
-//          platform: 'SOL',
-//          entryPrice: '$145.162',
-//          direction: 'Long',
-//          duration: '3h 17min',
-//          move: '-0.17%',
-//       },
-//       {
-//          address: '0x7A3C7...98765',
-//          trades: '8 trades',
-//          time: '5 hours ago',
-//          platform: 'ETH',
-//          entryPrice: '$235.250',
-//          direction: 'Short',
-//          duration: '2h 45min',
-//          move: '-0.35%',
-//       },
-//    ];
-
-//    useEffect(() => {
-//       const fetchTrades = async () => {
-//          try {
-//             const tradesCollection = collection(db, 'trades');
-//             const tradesSnapshot = await getDocs(tradesCollection);
-//             const tradesList = tradesSnapshot.docs.map((doc) => doc.data());
-//             console.log(tradesList);
-//             //   setTrades(tradesList);
-//          } catch (error) {
-//             console.error('Error fetching trades:', error);
-//          }
-//       };
-
-//       fetchTrades();
-//    }, []);
-
-//    return (
-//       <div className="mt-8">
-//          <div className="max-w-5xl flex mx-auto space-x-8 p-4">
-//             {trades.map((trade, index) => (
-//                <div
-//                   key={index}
-//                   className="w-full  p-4 px-5 rounded-3xl shadow-xl bg-gradient-to-b from-[#f87b7a] via-red-100   to-red-50"
-//                >
-//                   <div className="">
-//                      <div className="flex items-center justify-between">
-//                         <div className="flex space-x-3">
-//                            <svg
-//                               xmlns="http://www.w3.org/2000/svg"
-//                               viewBox="0 0 24 24"
-//                               fill="currentColor"
-//                               className="size-12"
-//                            >
-//                               <path
-//                                  fillRule="evenodd"
-//                                  d="M18.685 19.097A9.723 9.723 0 0 0 21.75 12c0-5.385-4.365-9.75-9.75-9.75S2.25 6.615 2.25 12a9.723 9.723 0 0 0 3.065 7.097A9.716 9.716 0 0 0 12 21.75a9.716 9.716 0 0 0 6.685-2.653Zm-12.54-1.285A7.486 7.486 0 0 1 12 15a7.486 7.486 0 0 1 5.855 2.812A8.224 8.224 0 0 1 12 20.25a8.224 8.224 0 0 1-5.855-2.438ZM15.75 9a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z"
-//                                  clipRule="evenodd"
-//                               />
-//                            </svg>
-//                            <div>
-//                               <span className="font-bold">{trade.address}</span>
-//                               <p>{trade.trades}</p>
-//                            </div>
-//                         </div>
-//                         <div>
-//                            <span>{trade.time}</span>
-//                         </div>
-//                      </div>
-//                      <div>
-//                         <div className="flex items-center justify-between mt-5">
-//                            <div>
-//                               <div className="space-x-3 pb-1">
-//                                  <span className="font-bold">
-//                                     {trade.platform}
-//                                  </span>
-//                                  <span className="bg-gray-100 p-1 rounded-xl">
-//                                     Platform
-//                                  </span>
-//                               </div>
-//                               <p>{trade.entryPrice}</p>
-//                            </div>
-//                            <div>
-//                               <div className="space-x-3 pb-1">
-//                                  <span>Entry Price</span>
-//                               </div>
-//                               <p>{trade.entryPrice}</p>
-//                            </div>
-//                         </div>
-//                      </div>
-//                   </div>
-//                   <div className="flex items-center justify-between mt-6 mx-4 px-8 py-2 rounded-xl border border-gray-600">
-//                      <div>
-//                         <p className="font-bold">{trade.direction}</p>
-//                         <p>Direction</p>
-//                      </div>
-//                      <div className="w-0.5 h-8 bg-black" />
-//                      <div>
-//                         <p className="font-bold">{trade.duration}</p>
-//                         <p>Duration</p>
-//                      </div>
-//                      <div className="w-0.5 h-8 bg-black" />
-//                      <div>
-//                         <p className="text-red-600">{trade.move}</p>
-//                         <p>Move</p>
-//                      </div>
-//                   </div>
-//                </div>
-//             ))}
-//          </div>
-//       </div>
-//    );
-// };
-
-// export default Events;
-
 import { useEffect, useState } from 'react';
 import { collection, getDocs } from 'firebase/firestore';
 import { formatDistanceToNow } from 'date-fns';
-import { Trade } from '../types/interfaces';
+import { Pool } from '../types/interfaces';
 import { db } from '@/firebase';
+import { ethers } from 'ethers';
+import priceOracleAbi from '@/app/components/contract/priceOracleAbi.json';
+import openPositionAbi from '@/app/components/contract/openPosition.json';
 
 // Function to shorten Ethereum address
 const shortenAddress = (address: string) => {
    return `${address.slice(0, 6)}...${address.slice(-4)}`;
 };
 
-// Function to convert timestamp to human-readable format
-const formatTimestamp = (timestamp: number | string) => {
-   let date: Date;
-
-   // Convert timestamp to milliseconds
-   if (typeof timestamp === 'string') {
-      const parsedTimestamp = parseInt(timestamp, 10);
-      date = new Date(parsedTimestamp * 1000); // Convert from seconds to milliseconds
-   } else if (typeof timestamp === 'number') {
-      date = new Date(timestamp * 1000); // Convert from seconds to milliseconds
-   } else {
-      console.error('Invalid timestamp type:', timestamp);
-      return 'Invalid date';
-   }
-
-   // Check if the date is valid
-   if (isNaN(date.getTime())) {
-      console.error('Invalid timestamp:', timestamp);
-      return 'Invalid date';
-   }
-
-   // Format the date to human-readable
-   return formatDistanceToNow(date, { addSuffix: true });
-};
-
-// Example usage
-const exampleTimestamp = 1666638380; // Example timestamp in seconds
-console.log(formatTimestamp(exampleTimestamp));
-
 const Events = () => {
-   // Initialize state with the Trade type
-   const [trades, setTrades] = useState<Trade[]>([]);
+   // Initialize state with the Pool type
+   const [trades, setTrades] = useState<Pool[]>([]);
+   const [oraclePrice, setOraclePrice] = useState('');
+   const [tradeStates, setTradeStates] = useState<
+      { isLong: boolean; amount: string }[]
+   >([]);
+
+   const [amount, setAmount] = useState<string>('');
+   const [isLong, setIsLong] = useState<boolean>(true);
+   const priceOracleContractAddress =
+      '0xcDC7cB917bE249A1ff5F623D5CF590eDA36236a7';
+
+   const openPositionContractAddress =
+      '0x248e4730C9e1Fce6512F2082dd73d48a6CaA318a';
 
    useEffect(() => {
       const fetchTrades = async () => {
          try {
-            const tradesCollection = collection(db, 'trades');
+            const tradesCollection = collection(db, 'pools');
             const tradesSnapshot = await getDocs(tradesCollection);
-            const tradesList: Trade[] = tradesSnapshot.docs.map(
-               (doc) => doc.data() as Trade
+            const tradesList: Pool[] = tradesSnapshot.docs.map(
+               (doc) => doc.data() as Pool
             );
-            console.log(tradesList);
             setTrades(tradesList);
+
+            // Initialize tradeStates based on the fetched trades
+            const initialTradeStates = tradesList.map(() => ({
+               isLong: true,
+               amount: '',
+            }));
+            setTradeStates(initialTradeStates);
          } catch (error) {
             console.error('Error fetching trades:', error);
          }
@@ -186,6 +54,105 @@ const Events = () => {
       fetchTrades();
    }, []);
 
+   function formatTimestamp(startBlock: number, endBlock: number): string {
+      const difference = endBlock - startBlock;
+
+      // Convert block difference to a human-readable format
+      const seconds = difference % 60;
+      const minutes = Math.floor((difference % 3600) / 60);
+      const hours = Math.floor(difference / 3600);
+
+      return `${hours}h ${minutes}m ${seconds}s`;
+   }
+
+   const PoolsPrice = async (priceId: string) => {
+      const alchemyApiKey =
+         'https://eth-sepolia.g.alchemy.com/v2/k876etRLMsoIcTpTzkkTuh3LPBTK96YZ';
+      const provider = new ethers.JsonRpcProvider(alchemyApiKey);
+      console.log(provider);
+
+      const poolPriceInstance = new ethers.Contract(
+         priceOracleContractAddress,
+         priceOracleAbi,
+         provider
+      );
+
+      const poolPrice = await poolPriceInstance.pools(priceId);
+      console.log('Raw price from contract:', poolPrice.toString());
+   };
+
+   useEffect(() => {
+      const getOraclePrice = async () => {
+         console.log('Hello oracle');
+         try {
+            const alchemyApiKey =
+               'https://eth-sepolia.g.alchemy.com/v2/k876etRLMsoIcTpTzkkTuh3LPBTK96YZ';
+            const provider = new ethers.JsonRpcProvider(alchemyApiKey);
+            console.log(provider);
+
+            const oracleInstance = new ethers.Contract(
+               priceOracleContractAddress,
+               priceOracleAbi,
+               provider
+            );
+            console.log(oracleInstance);
+
+            const price = await oracleInstance.getLatestPrice();
+            console.log('Raw price from contract:', price.toString());
+
+            // Format the price (assuming it's in wei)
+            const formattedPrice = ethers.formatUnits(price, 18);
+            console.log('Formatted price:', formattedPrice);
+
+            setOraclePrice(formattedPrice);
+         } catch (error) {
+            console.log('Failed to fetch oracle price:', error);
+         }
+      };
+
+      getOraclePrice();
+   }, []);
+
+   console.log(oraclePrice);
+
+   const handleDirectionChange = (index: number, direction: boolean) => {
+      setTradeStates((prevStates) =>
+         prevStates.map((state, i) =>
+            i === index ? { ...state, isLong: direction } : state
+         )
+      );
+   };
+
+   const handleAmountChange = (index: number, value: string) => {
+      setTradeStates((prevStates) =>
+         prevStates.map((state, i) =>
+            i === index ? { ...state, amount: value } : state
+         )
+      );
+   };
+   const OpenPosition = async (poolId: string, index: number) => {
+      const { isLong, amount } = tradeStates[index];
+      try {
+         const provider = new ethers.JsonRpcProvider(
+            'https://eth-sepolia.g.alchemy.com/v2/k876etRLMsoIcTpTzkkTuh3LPBTK96YZ'
+         );
+
+         const minShares = 0;
+         const amountInWei = ethers.parseUnits(amount, 18);
+         console.log({ poolId, isLong, amountInWei, minShares });
+
+         // const tx = await positionContract.openPosition(
+         //    poolId,
+         //    isLong,
+         //    amountInWei,
+         //    minShares
+         // );
+         // await tx.wait();
+         // console.log('Position opened successfully:', tx);
+      } catch (error) {
+         console.error('Failed to open position:', error);
+      }
+   };
    return (
       <div className="mt-8">
          <div className="max-w-5xl flex mx-auto space-x-8 p-4">
@@ -211,14 +178,20 @@ const Events = () => {
                            </svg>
                            <div>
                               <span className="font-bold">
-                                 {shortenAddress(trade.trader)}
+                                 {/* {shortenAddress(trade.trader)} */}
+                                 0x00...0987
                               </span>
                               {/* <p>{trade.trades}</p> */}
                               <p>13 trades</p>
                            </div>
                         </div>
                         <div>
-                           <span>{formatTimestamp(trade.timestamp)}</span>
+                           <span>
+                              {formatTimestamp(
+                                 Number(trade.startBlock),
+                                 Number(trade.endBlock)
+                              )}
+                           </span>
                         </div>
                      </div>
                      <div>
@@ -226,38 +199,67 @@ const Events = () => {
                            <div>
                               <div className="space-x-3 pb-1">
                                  <span className="font-bold">
-                                    {trade.platform}
+                                    {/* {trade.platform} */}
+                                    ETH
                                  </span>
                                  <span className="bg-gray-100 p-1 rounded-xl">
-                                    Platform
+                                    eth
                                  </span>
                               </div>
-                              <p>${trade.entryPrice}</p>
+                              {/* <p>${trade.entryPrice}</p> */}
+                              <p>${oraclePrice}</p>
                            </div>
                            <div>
                               <div className="space-x-3 pb-1">
                                  <span>Entry Price</span>
                               </div>
-                              <p>{trade.entryPrice}</p>
+                              {/* <p>{trade.entryPrice}</p> */}
+                              {/* <p>${ PoolsPrice(trade.poolId)}</p> */}
                            </div>
                         </div>
                      </div>
                   </div>
+
+                  {/* Long/Short Selection */}
                   <div className="flex items-center justify-between mt-6 mx-4 px-8 py-2 rounded-xl border border-gray-600">
-                     <div>
-                        <p className="font-bold">{trade.direction}</p>
-                        <p>Direction</p>
+                     <div
+                        onClick={() => handleDirectionChange(index, true)}
+                        className={`cursor-pointer p-2 rounded ${
+                           tradeStates[index]?.isLong ? 'bg-green-300' : ''
+                        }`}
+                     >
+                        <p className="font-bold">Long</p>
                      </div>
                      <div className="w-0.5 h-8 bg-black" />
                      <div>
-                        <p className="font-bold">{trade.duration}</p>
                         <p>Duration</p>
                      </div>
                      <div className="w-0.5 h-8 bg-black" />
-                     <div>
-                        <p className="text-red-600">{trade.move}</p>
-                        <p>Move</p>
+                     <div
+                        onClick={() => handleDirectionChange(index, false)}
+                        className={`cursor-pointer p-2 rounded ${
+                           !tradeStates[index]?.isLong ? 'bg-red-300' : ''
+                        }`}
+                     >
+                        <p className="font-bold">Short</p>
                      </div>
+                  </div>
+                  <div className="flex flex-col">
+                     <input
+                        type="text"
+                        className="pt-2 m-2 p-2"
+                        value={tradeStates[index]?.amount || ''}
+                        onChange={(e) =>
+                           handleAmountChange(index, e.target.value)
+                        }
+                        placeholder="Enter amount"
+                     />
+                     <button
+                        onClick={() => OpenPosition(trade.poolId, index)}
+                        className="bg-pink-300 p-2"
+                     >
+                        Open Position
+                     </button>
                   </div>
                </div>
             ))}
@@ -267,3 +269,29 @@ const Events = () => {
 };
 
 export default Events;
+
+//   <div className="flex items-center justify-between mt-6 mx-4 px-8 py-2 rounded-xl border border-gray-600">
+//                      <div
+//                         onClick={() => handleDirectionChange(index, true)}
+//                         className={`cursor-pointer p-2 rounded ${
+//                            tradeStates[index]?.isLong ? 'bg-green-300' : ''
+//                         }`}
+//                      >
+//                         <p className="font-bold">Long</p>
+//                         <p>Direction</p>
+//                      </div>
+//                      <div className="w-0.5 h-8 bg-black" />
+//                      <div>
+//                         <p>Duration</p>
+//                      </div>
+//                      <div className="w-0.5 h-8 bg-black" />
+//                      <div
+//                         onClick={() => handleDirectionChange(index, false)}
+//                         className={`cursor-pointer p-2 rounded ${
+//                            !tradeStates[index]?.isLong ? 'bg-red-300' : ''
+//                         }`}
+//                      >
+//                         <p>Short</p>
+//                         <p>Direction</p>
+//                      </div>
+//                   </div>

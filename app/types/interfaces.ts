@@ -7,3 +7,11 @@ export interface Trade {
    move: string;
    timestamp: string;
 }
+
+export interface Pool {
+   poolId: string;
+   startBlock: string;
+   endBlock: string;
+   leverageLong: string;
+   leverageShort: string;
+}
