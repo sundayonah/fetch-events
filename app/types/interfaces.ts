@@ -14,4 +14,6 @@ export interface Pool {
    endBlock: string;
    leverageLong: string;
    leverageShort: string;
+   isLong: boolean;
+   price: number;
 }

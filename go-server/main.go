@@ -1,384 +1,31 @@
-// package main
-
-// import (
-// 	"context"
-// 	"encoding/json"
-// 	"fmt"
-// 	"io/ioutil"
-// 	"log"
-// 	"math/big"
-// 	"os"
-
-// 	firebase "firebase.google.com/go"
-// 	"github.com/ethereum/go-ethereum"
-// 	"github.com/ethereum/go-ethereum/accounts/abi"
-// 	"github.com/ethereum/go-ethereum/common"
-// 	"github.com/ethereum/go-ethereum/core/types"
-// 	"github.com/ethereum/go-ethereum/ethclient"
-// 	"google.golang.org/api/option"
-// )
-
-// type PoolCreatedEvent struct {
-// 	StartBlock    *big.Int
-// 	EndBlock      *big.Int
-// 	LeverageLong  *big.Int
-// 	LeverageShort *big.Int
-// 	Raw           types.Log
-// }
-
-// func loadABI(abiPath string) (*abi.ABI, error) {
-// 	file, err := os.Open(abiPath)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	defer file.Close()
-
-// 	byteValue, err := ioutil.ReadAll(file)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	var parsedABI abi.ABI
-// 	if err := json.Unmarshal(byteValue, &parsedABI); err != nil {
-// 		return nil, err
-// 	}
-
-// 	return &parsedABI, nil
-// }
-
-// func main() {
-// 	// Load the ABI from the JSON file
-// 	abiPath := "trades.json"
-// 	contractABI, err := loadABI(abiPath)
-// 	if err != nil {
-// 		log.Fatalf("Failed to load contract ABI: %v", err)
-// 	}
-
-// 	// Connect to an Ethereum node
-// 	client, err := ethclient.Dial("wss://eth-sepolia.g.alchemy.com/v2/k876etRLMsoIcTpTzkkTuh3LPBTK96YZ")
-// 	if err != nil {
-// 		log.Fatalf("Failed to connect to the Ethereum client: %v", err)
-// 	}
-
-// 	contractAddress := common.HexToAddress("0x57B5F08EE7Bf77b0118F3FB929B280A0E4FC3a19")
-
-// 	// Firebase setup
-// 	ctx := context.Background()
-// 	sa := option.WithCredentialsFile("serviceAccountKey.json")
-// 	app, err := firebase.NewApp(ctx, nil, sa)
-// 	if err != nil {
-// 		log.Fatalf("error initializing app: %v", err)
-// 	}
-
-// 	firestoreClient, err := app.Firestore(ctx)
-// 	if err != nil {
-// 		log.Fatalf("error initializing Firestore client: %v", err)
-// 	}
-// 	defer firestoreClient.Close()
-
-// 	// Watch for PoolCreated events
-// 	query := ethereum.FilterQuery{
-// 		Addresses: []common.Address{contractAddress},
-// 	}
-// 	logs := make(chan types.Log)
-// 	subscription, err := client.SubscribeFilterLogs(ctx, query, logs)
-// 	if err != nil {
-// 		log.Fatalf("Failed to subscribe to event: %v", err)
-// 	}
-
-// 	fmt.Println("Listening for PoolCreated events...")
-
-// 	for {
-// 		select {
-// 		case err := <-subscription.Err():
-// 			log.Fatalf("Error: %v", err)
-// 		case vLog := <-logs:
-// 			fmt.Printf("New Pool Created: %+v\n", vLog)
-
-// 			// Decode the event
-// 			var event PoolCreatedEvent
-
-// 			err := contractABI.UnpackIntoInterface(&event, "PoolCreated", vLog.Data)
-// 			if err != nil {
-// 				log.Fatalf("Failed to unpack event data: %v", err)
-// 			}
-
-// 			// Extract the PoolId from the topics
-// 			poolId := new(big.Int).SetBytes(vLog.Topics[1].Bytes())
-
-// 			startBlockInt := int64(0)
-// 			if event.StartBlock != nil {
-// 				startBlockInt = event.StartBlock.Int64()
-// 			}
-// 			endBlockInt := int64(0)
-// 			if event.EndBlock != nil {
-// 				endBlockInt = event.EndBlock.Int64()
-// 			}
-// 			leverageLongInt := int64(0)
-// 			if event.LeverageLong != nil {
-// 				leverageLongInt = event.LeverageLong.Int64()
-// 			}
-// 			leverageShortInt := int64(0)
-// 			if event.LeverageShort != nil {
-// 				leverageShortInt = event.LeverageShort.Int64()
-// 			}
-
-// 			// Send the pool data to Firebase
-// 			_, _, err = firestoreClient.Collection("pools").Add(ctx, map[string]interface{}{
-// 				"poolId":        poolId.Int64(),
-// 				"startBlock":    startBlockInt,
-// 				"endBlock":      endBlockInt,
-// 				"leverageLong":  leverageLongInt,
-// 				"leverageShort": leverageShortInt,
-// 			})
-// 			if err != nil {
-// 				log.Fatalf("Failed to save pool to Firestore: %v", err)
-// 			}
-// 		}
-// 	}
-// }
-
-// //    const PoolsPrice = async (priceId: string) => {
-// //       const alchemyApiKey =
-// //          'https://eth-sepolia.g.alchemy.com/v2/k876etRLMsoIcTpTzkkTuh3LPBTK96YZ';
-// //       const provider = new ethers.JsonRpcProvider(alchemyApiKey);
-// //       console.log(provider);
-
-// //       const poolPriceInstance = new ethers.Contract(
-// //          priceOracleContractAddress,
-// //          priceOracleAbi,
-// //          provider
-// //       );
-
-// //       const poolPrice = await poolPriceInstance.pools(priceId);
-// //       console.log('Raw price from contract:', poolPrice.toString());
-// //    };
-
-// package main
-
-// import (
-// 	"context"
-// 	"encoding/json"
-// 	"fmt"
-// 	"io/ioutil"
-// 	"log"
-// 	"math/big"
-// 	"os"
-// 	"strings"
-
-// 	firebase "firebase.google.com/go"
-// 	"github.com/ethereum/go-ethereum"
-// 	"github.com/ethereum/go-ethereum/accounts/abi"
-// 	"github.com/ethereum/go-ethereum/common"
-// 	"github.com/ethereum/go-ethereum/core/types"
-// 	"github.com/ethereum/go-ethereum/ethclient"
-// 	"google.golang.org/api/option"
-// )
-
-// type PoolCreatedEvent struct {
-// 	StartBlock    *big.Int
-// 	EndBlock      *big.Int
-// 	LeverageLong  *big.Int
-// 	LeverageShort *big.Int
-// 	Raw           types.Log
-// }
-
-// // type PriceUpdatedEvent struct {
-// // 	latestPrice *big.Int
-// // 	updateBlock *big.Int
-// // 	Raw         types.Log
-// // }
-
-// func loadABI(abiPath string) (*abi.ABI, error) {
-// 	file, err := os.Open(abiPath)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	defer file.Close()
-
-// 	byteValue, err := ioutil.ReadAll(file)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	var parsedABI abi.ABI
-// 	if err := json.Unmarshal(byteValue, &parsedABI); err != nil {
-// 		return nil, err
-// 	}
-
-// 	return &parsedABI, nil
-// }
-
-// // ABI definition
-// const priceABI = `[{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint256","name":"newPrice","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"updateBlock","type":"uint256"}],"name":"PriceUpdated","type":"event"}]`
-
-// type PriceUpdatedEvent struct {
-// 	NewPrice    *big.Int `json:"newPrice"`
-// 	UpdateBlock *big.Int `json:"updateBlock"`
-// }
-
-// func main() {
-// 	// Load the ABIs from the JSON files
-// 	poolABIPath := "trades.json"
-// 	contractABI, err := loadABI(poolABIPath)
-// 	if err != nil {
-// 		log.Fatalf("Failed to load contract ABI: %v", err)
-// 	}
-
-// 	// priceABIPath := "priceOracleAbi.json"
-// 	// priceABI, err := loadABI(priceABIPath)
-// 	// if err != nil {
-// 	// 	log.Fatalf("Failed to load price contract ABI: %v", err)
-// 	// }
-
-// 	// Parse the ABI
-// 	priceABI, err := abi.JSON(strings.NewReader(priceABI))
-// 	if err != nil {
-// 		log.Fatalf("Failed to parse ABI: %v", err)
-// 	}
-
-// 	// Connect to an Ethereum node
-// 	client, err := ethclient.Dial("wss://eth-sepolia.g.alchemy.com/v2/k876etRLMsoIcTpTzkkTuh3LPBTK96YZ")
-// 	if err != nil {
-// 		log.Fatalf("Failed to connect to the Ethereum client: %v", err)
-// 	}
-
-// 	poolContractAddress := common.HexToAddress("0x57B5F08EE7Bf77b0118F3FB929B280A0E4FC3a19")
-// 	priceContractAddress := common.HexToAddress("0xcDC7cB917bE249A1ff5F623D5CF590eDA36236a7")
-
-// 	// Firebase setup
-// 	ctx := context.Background()
-// 	sa := option.WithCredentialsFile("serviceAccountKey.json")
-// 	app, err := firebase.NewApp(ctx, nil, sa)
-// 	if err != nil {
-// 		log.Fatalf("error initializing app: %v", err)
-// 	}
-
-// 	firestoreClient, err := app.Firestore(ctx)
-// 	if err != nil {
-// 		log.Fatalf("error initializing Firestore client: %v", err)
-// 	}
-// 	defer firestoreClient.Close()
-
-// 	// Watch for PoolCreated and PriceUpdated events
-// 	poolQuery := ethereum.FilterQuery{
-// 		Addresses: []common.Address{poolContractAddress},
-// 	}
-// 	priceQuery := ethereum.FilterQuery{
-// 		Addresses: []common.Address{priceContractAddress},
-// 	}
-
-// 	logs := make(chan types.Log)
-
-// 	poolSubscription, err := client.SubscribeFilterLogs(ctx, poolQuery, logs)
-// 	if err != nil {
-// 		log.Fatalf("Failed to subscribe to pool event: %v", err)
-// 	}
-
-// 	priceSubscription, err := client.SubscribeFilterLogs(ctx, priceQuery, logs)
-// 	if err != nil {
-// 		log.Fatalf("Failed to subscribe to price event: %v", err)
-// 	}
-
-// 	fmt.Println("Listening for PoolCreated and PriceUpdated events...")
-
-// 	for {
-// 		select {
-// 		case err := <-poolSubscription.Err():
-// 			log.Fatalf("Pool subscription error: %v", err)
-// 		case err := <-priceSubscription.Err():
-// 			log.Fatalf("Price subscription error: %v", err)
-// 		case vLog := <-logs:
-// 			switch vLog.Address {
-// 			case poolContractAddress:
-// 				fmt.Printf("New Pool Created: %+v\n", vLog)
-
-// 				var event PoolCreatedEvent
-// 				err := contractABI.UnpackIntoInterface(&event, "PoolCreated", vLog.Data)
-// 				if err != nil {
-// 					log.Fatalf("Failed to unpack pool event data: %v", err)
-// 				}
-
-// 				poolId := new(big.Int).SetBytes(vLog.Topics[1].Bytes())
-
-// 				startBlockInt := int64(0)
-// 				if event.StartBlock != nil {
-// 					startBlockInt = event.StartBlock.Int64()
-// 				}
-// 				endBlockInt := int64(0)
-// 				if event.EndBlock != nil {
-// 					endBlockInt = event.EndBlock.Int64()
-// 				}
-// 				leverageLongInt := int64(0)
-// 				if event.LeverageLong != nil {
-// 					leverageLongInt = event.LeverageLong.Int64()
-// 				}
-// 				leverageShortInt := int64(0)
-// 				if event.LeverageShort != nil {
-// 					leverageShortInt = event.LeverageShort.Int64()
-// 				}
-
-// 				_, _, err = firestoreClient.Collection("pools").Add(ctx, map[string]interface{}{
-// 					"poolId":        poolId.Int64(),
-// 					"startBlock":    startBlockInt,
-// 					"endBlock":      endBlockInt,
-// 					"leverageLong":  leverageLongInt,
-// 					"leverageShort": leverageShortInt,
-// 				})
-// 				if err != nil {
-// 					log.Fatalf("Failed to save pool to Firestore: %v", err)
-// 				}
-// 			case priceContractAddress:
-// 				fmt.Printf("Price Updated: %+v\n", vLog)
-
-// 				var event PriceUpdatedEvent
-// 				err := priceABI.UnpackIntoInterface(&event, "PriceUpdated", vLog.Data)
-// 				if err != nil {
-// 					log.Fatalf("Failed to unpack price event data: %v", err)
-// 				}
-// 				fmt.Print(event)
-// 				priceInt := int64(0)
-// 				if event.NewPrice != nil {
-// 					priceInt = event.NewPrice.Int64()
-// 				}
-
-// 				blockNumberInt := int64(0)
-// 				if event.UpdateBlock != nil {
-// 					blockNumberInt = event.UpdateBlock.Int64()
-// 				}
-
-// 				_, _, err = firestoreClient.Collection("prices").Add(ctx, map[string]interface{}{
-// 					"price":       priceInt,
-// 					"blockNumber": blockNumberInt,
-// 				})
-// 				if err != nil {
-// 					log.Fatalf("Failed to save price to Firestore: %v", err)
-// 				}
-// 			}
-// 		}
-// 	}
-// }
-
 package main
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"math/big"
+	"net/http"
 	"os"
 	"strings"
 
-	firebase "firebase.google.com/go"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"google.golang.org/api/option"
+	_ "github.com/lib/pq" // Import the PostgreSQL driver
 )
+
+var db *sql.DB
+
+// Struct to match the JSON structure of the contract artifact
+type ContractArtifact struct {
+	ABI json.RawMessage `json:"abi"`
+}
 
 type PoolCreatedEvent struct {
 	StartBlock    *big.Int
@@ -389,18 +36,35 @@ type PoolCreatedEvent struct {
 }
 
 type PriceUpdatedEvent struct {
-	NewPrice    *big.Int `json:"newPrice"`
+	NewPrice    *big.Int
 	UpdateBlock *big.Int `json:"updateBlock"`
 }
 
-func loadABI(abiPath string) (*abi.ABI, error) {
-	file, err := os.Open(abiPath)
+type Deployment struct {
+	Network          string `json:"network"`
+	BondingCurve     string `json:"bondingCurve"`
+	PriceOracle      string `json:"priceOracle"`
+	GlpManager       string `json:"glpManager"`
+	PredictionMarket string `json:"predictionMarket"`
+}
+
+func readFile(filePath string) ([]byte, error) {
+	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, err
 	}
 	defer file.Close()
 
 	byteValue, err := ioutil.ReadAll(file)
+	if err != nil {
+		return nil, err
+	}
+
+	return byteValue, nil
+}
+
+func loadABI(abiPath string) (*abi.ABI, error) {
+	byteValue, err := readFile(abiPath)
 	if err != nil {
 		return nil, err
 	}
@@ -413,73 +77,126 @@ func loadABI(abiPath string) (*abi.ABI, error) {
 	return &parsedABI, nil
 }
 
-const priceABI = `[{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint256","name":"newPrice","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"updateBlock","type":"uint256"}],"name":"PriceUpdated","type":"event"}]`
-
-func main() {
-	// Load the ABI for the pool contract
-	poolABIPath := "trades.json"
-	contractABI, err := loadABI(poolABIPath)
+// Initialize the database connection
+func initDB() {
+	var err error
+	db, err = sql.Open("postgres", "postgres://postgres:Encoded.001@localhost:5432/postgres?sslmode=disable")
 	if err != nil {
-		log.Fatalf("Failed to load contract ABI: %v", err)
+		log.Fatalf("Failed to connect to the PostgreSQL database: %v", err)
+	}
+}
+
+// Pool struct for JSON response
+type Pool struct {
+	PoolID        string `json:"poolId"`
+	StartBlock    int    `json:"startBlock"`
+	EndBlock      int    `json:"endBlock"`
+	LeverageLong  int    `json:"leverageLong"`
+	LeverageShort int    `json:"leverageShort"`
+}
+
+// Price struct for JSON response
+type Price struct {
+	Price string `json:"price"`
+}
+
+// getPools handles the /api/pools endpoint
+func getPools(w http.ResponseWriter, r *http.Request) {
+	rows, err := db.Query("SELECT poolId, startBlock, endBlock, leverageLong, leverageShort FROM pools")
+	if err != nil {
+		http.Error(w, "Failed to query database", http.StatusInternalServerError)
+		log.Println("Error querying database:", err)
+		return
+	}
+	defer rows.Close()
+
+	var pools []Pool
+	for rows.Next() {
+		var pool Pool
+		if err := rows.Scan(&pool.PoolID, &pool.StartBlock, &pool.EndBlock, &pool.LeverageLong, &pool.LeverageShort); err != nil {
+			http.Error(w, "Failed to read database result", http.StatusInternalServerError)
+			log.Println("Error reading result:", err)
+			return
+		}
+		pools = append(pools, pool)
 	}
 
-	// Parse the ABI for the price contract
-	priceABI, err := abi.JSON(strings.NewReader(priceABI))
-	if err != nil {
-		log.Fatalf("Failed to parse ABI: %v", err)
+	if err := rows.Err(); err != nil {
+		http.Error(w, "Error occurred during iteration", http.StatusInternalServerError)
+		log.Println("Row iteration error:", err)
+		return
 	}
 
-	// Connect to an Ethereum node
-	client, err := ethclient.Dial("wss://eth-sepolia.g.alchemy.com/v2/k876etRLMsoIcTpTzkkTuh3LPBTK96YZ")
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(pools); err != nil {
+		http.Error(w, "Failed to encode JSON", http.StatusInternalServerError)
+		log.Println("Error encoding JSON:", err)
+	}
+}
+
+// getPrices handles the /api/prices endpoint
+func getPrices(w http.ResponseWriter, r *http.Request) {
+	rows, err := db.Query("SELECT price FROM prices")
 	if err != nil {
-		log.Fatalf("Failed to connect to the Ethereum client: %v", err)
+		http.Error(w, "Failed to query database", http.StatusInternalServerError)
+		log.Println("Error querying database:", err)
+		return
+	}
+	defer rows.Close()
+
+	var prices []Price
+	for rows.Next() {
+		var price Price
+		if err := rows.Scan(&price.Price); err != nil {
+			http.Error(w, "Failed to read database result", http.StatusInternalServerError)
+			log.Println("Error reading result:", err)
+			return
+		}
+		prices = append(prices, price)
 	}
 
-	poolContractAddress := common.HexToAddress("0x57B5F08EE7Bf77b0118F3FB929B280A0E4FC3a19")
-	priceContractAddress := common.HexToAddress("0xcDC7cB917bE249A1ff5F623D5CF590eDA36236a7")
-
-	// Firebase setup
-	ctx := context.Background()
-	sa := option.WithCredentialsFile("serviceAccountKey.json")
-	app, err := firebase.NewApp(ctx, nil, sa)
-	if err != nil {
-		log.Fatalf("error initializing app: %v", err)
+	if err := rows.Err(); err != nil {
+		http.Error(w, "Error occurred during iteration", http.StatusInternalServerError)
+		log.Println("Row iteration error:", err)
+		return
 	}
 
-	firestoreClient, err := app.Firestore(ctx)
-	if err != nil {
-		log.Fatalf("error initializing Firestore client: %v", err)
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(prices); err != nil {
+		http.Error(w, "Failed to encode JSON", http.StatusInternalServerError)
+		log.Println("Error encoding JSON:", err)
 	}
-	defer firestoreClient.Close()
+}
 
-	// Watch for PoolCreated and PriceUpdated events
+// Function to listen for Ethereum events
+func listenForEvents(client *ethclient.Client, contractABI *abi.ABI, priceABI *abi.ABI, poolContractAddress, oracleContractAddress common.Address) {
+	logs := make(chan types.Log)
+
 	poolQuery := ethereum.FilterQuery{
 		Addresses: []common.Address{poolContractAddress},
 	}
-	priceQuery := ethereum.FilterQuery{
-		Addresses: []common.Address{priceContractAddress},
+	oracleQuery := ethereum.FilterQuery{
+		Addresses: []common.Address{oracleContractAddress},
 	}
 
-	logs := make(chan types.Log)
-
-	poolSubscription, err := client.SubscribeFilterLogs(ctx, poolQuery, logs)
+	poolSubscription, err := client.SubscribeFilterLogs(context.Background(), poolQuery, logs)
 	if err != nil {
 		log.Fatalf("Failed to subscribe to pool event: %v", err)
 	}
 
-	priceSubscription, err := client.SubscribeFilterLogs(ctx, priceQuery, logs)
+	oracleSubscription, err := client.SubscribeFilterLogs(context.Background(), oracleQuery, logs)
 	if err != nil {
-		log.Fatalf("Failed to subscribe to price event: %v", err)
+		log.Fatalf("Failed to subscribe to oracle event: %v", err)
 	}
 
-	fmt.Println("Listening for PoolCreated and PriceUpdated events...")
+	fmt.Println("Listening for PoolCreated and Oracle events...")
 
 	for {
 		select {
 		case err := <-poolSubscription.Err():
 			log.Fatalf("Pool subscription error: %v", err)
-		case err := <-priceSubscription.Err():
-			log.Fatalf("Price subscription error: %v", err)
+		case err := <-oracleSubscription.Err():
+			log.Fatalf("Oracle subscription error: %v", err)
 		case vLog := <-logs:
 			switch vLog.Address {
 			case poolContractAddress:
@@ -510,17 +227,15 @@ func main() {
 					leverageShortInt = event.LeverageShort.Int64()
 				}
 
-				_, _, err = firestoreClient.Collection("pools").Add(ctx, map[string]interface{}{
-					"poolId":        poolId.Int64(),
-					"startBlock":    startBlockInt,
-					"endBlock":      endBlockInt,
-					"leverageLong":  leverageLongInt,
-					"leverageShort": leverageShortInt,
-				})
+				_, err = db.Exec(
+					"INSERT INTO pools (poolId, startBlock, endBlock, leverageLong, leverageShort) VALUES ($1, $2, $3, $4, $5)",
+					poolId.Int64(), startBlockInt, endBlockInt, leverageLongInt, leverageShortInt,
+				)
 				if err != nil {
-					log.Fatalf("Failed to save pool to Firestore: %v", err)
+					log.Fatalf("Failed to save pool to SQL database: %v", err)
 				}
-			case priceContractAddress:
+
+			case oracleContractAddress:
 				fmt.Printf("Price Updated: %+v\n", vLog)
 
 				var event PriceUpdatedEvent
@@ -530,24 +245,56 @@ func main() {
 				}
 				fmt.Printf("Event Details: %+v\n", event)
 
-				priceInt := int64(0)
-				if event.NewPrice != nil {
-					priceInt = event.NewPrice.Int64()
-				}
+				priceStr := event.NewPrice.String()
 
-				blockNumberInt := int64(0)
-				if event.UpdateBlock != nil {
-					blockNumberInt = event.UpdateBlock.Int64()
-				}
-
-				_, _, err = firestoreClient.Collection("prices").Add(ctx, map[string]interface{}{
-					"price":       priceInt,
-					"blockNumber": blockNumberInt,
-				})
+				_, err = db.Exec(
+					"INSERT INTO prices (price) VALUES ($1)",
+					priceStr,
+				)
 				if err != nil {
-					log.Fatalf("Failed to save price to Firestore: %v", err)
+					log.Fatalf("Failed to save price to SQL database: %v", err)
 				}
 			}
 		}
 	}
+}
+
+func main() {
+	// Initialize database connection
+	initDB()
+	defer db.Close()
+
+	// Load the ABI for the pool contract
+	poolABIPath := "trades.json"
+	contractABI, err := loadABI(poolABIPath)
+	if err != nil {
+		log.Fatalf("Failed to load contract ABI: %v", err)
+	}
+
+	const priceABIPath = `[{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint256","name":"newPrice","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"updateBlock","type":"uint256"}],"name":"PriceUpdated","type":"event"}]`
+
+	// Parse the ABI for the price contract
+	priceABI, err := abi.JSON(strings.NewReader(priceABIPath))
+	if err != nil {
+		log.Fatalf("Failed to parse ABI: %v", err)
+	}
+
+	// Connect to an Ethereum node
+	client, err := ethclient.Dial("wss://eth-sepolia.g.alchemy.com/v2/k876etRLMsoIcTpTzkkTuh3LPBTK96YZ")
+	if err != nil {
+		log.Fatalf("Failed to connect to the Ethereum client: %v", err)
+	}
+
+	poolContractAddress := common.HexToAddress("0x57B5F08EE7Bf77b0118F3FB929B280A0E4FC3a19")
+	oracleContractAddress := common.HexToAddress("0xcDC7cB917bE249A1ff5F623D5CF590eDA36236a7")
+
+	// Start listening for Ethereum events in a separate Goroutine
+	go listenForEvents(client, contractABI, &priceABI, poolContractAddress, oracleContractAddress)
+
+	// Set up HTTP server
+	http.HandleFunc("/api/pools", getPools)
+	http.HandleFunc("/api/prices", getPrices)
+
+	log.Println("Server started on :8080")
+	log.Fatal(http.ListenAndServe(":8080", nil))
 }

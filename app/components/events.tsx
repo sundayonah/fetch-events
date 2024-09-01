@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { collection, getDocs } from 'firebase/firestore';
 import { formatDistanceToNow } from 'date-fns';
-import { Pool } from '../types/interfaces';
+// import { Pool } from '../types/interfaces';
 import { db } from '@/firebase';
 import { ethers } from 'ethers';
 import priceOracleAbi from '@/app/components/contract/priceOracleAbi.json';
@@ -14,44 +14,163 @@ const shortenAddress = (address: string) => {
    return `${address.slice(0, 6)}...${address.slice(-4)}`;
 };
 
+type Pool = {
+   poolId: string;
+   startBlock: string;
+   endBlock: string;
+   leverageLong: string;
+   leverageShort: string;
+   isLong: boolean;
+   price: number;
+};
+
+type Price = {
+   price: string;
+};
+
+type CombinedData = {
+   pools: Pool[];
+   prices: Price[];
+};
+
+type Pools = {
+   poolId: string;
+   startBlock: number;
+   endBlock: number;
+   leverageLong: number;
+   leverageShort: number;
+};
+
+type Prices = {
+   price: string;
+};
+
+type CombinedDataItem = {
+   poolId: string;
+   startBlock: number;
+   endBlock: number;
+   leverageLong: number;
+   leverageShort: number;
+   price: string;
+};
+
+type CombinedDatas = {
+   items: CombinedDataItem[];
+};
+
 const Events = () => {
    // Initialize state with the Pool type
+   const [data, setData] = useState<CombinedDatas | null>(null);
+
    const [trades, setTrades] = useState<Pool[]>([]);
    const [oraclePrice, setOraclePrice] = useState('');
    const [tradeStates, setTradeStates] = useState<
       { isLong: boolean; amount: string }[]
    >([]);
 
-   const [amount, setAmount] = useState<string>('');
-   const [isLong, setIsLong] = useState<boolean>(true);
    const priceOracleContractAddress =
       '0xcDC7cB917bE249A1ff5F623D5CF590eDA36236a7';
 
    const openPositionContractAddress =
       '0x248e4730C9e1Fce6512F2082dd73d48a6CaA318a';
 
+   // useEffect(() => {
+   //    const fetchTrades = async () => {
+   //       try {
+   //          // trades
+   //          const tradesCollection = collection(db, 'pools');
+   //          const tradesSnapshot = await getDocs(tradesCollection);
+   //          const tradesList: Pool[] = tradesSnapshot.docs.map(
+   //             (doc) => doc.data() as Pool
+   //          );
+   //          setTrades(tradesList);
+
+   //          ////price
+   //          const pricesCollection = collection(db, 'prices');
+   //          const pricesSnapshot = await getDocs(pricesCollection);
+   //          const priceList = pricesSnapshot.docs.map((doc) => doc.data());
+   //          console.log(priceList, 'price list');
+
+   //          // Initialize tradeStates based on the fetched trades
+   //          const initialTradeStates = tradesList.map(() => ({
+   //             isLong: true,
+   //             amount: '',
+   //          }));
+   //          setTradeStates(initialTradeStates);
+   //       } catch (error) {
+   //          console.error('Error fetching trades:', error);
+   //       }
+   //    };
+
+   //    fetchTrades();
+   // }, []);
+
    useEffect(() => {
-      const fetchTrades = async () => {
+      const fetchTradesAndPrices = async () => {
          try {
+            // Fetch trades
             const tradesCollection = collection(db, 'pools');
             const tradesSnapshot = await getDocs(tradesCollection);
             const tradesList: Pool[] = tradesSnapshot.docs.map(
                (doc) => doc.data() as Pool
             );
-            setTrades(tradesList);
 
-            // Initialize tradeStates based on the fetched trades
-            const initialTradeStates = tradesList.map(() => ({
-               isLong: true,
+            // Fetch prices
+            const pricesCollection = collection(db, 'prices');
+            const pricesSnapshot = await getDocs(pricesCollection);
+            const priceList = pricesSnapshot.docs.map((doc) => doc.data());
+            // const priceList = pricesSnapshot.docs.map((doc) => ({
+            //    blockNumber: doc.get('blockNumber'),
+            //    price: doc.get('price'),
+            // }));
+
+            const combinedList = priceList.map((priceItem, index) => {
+               const tradeItem = tradesList[index];
+               return {
+                  ...priceItem,
+                  ...tradeItem,
+               };
+            });
+
+            // console.log(combinedList, 'PRICE LIST AND TRADE LIST combine');
+
+            // // Combine trades and prices
+            // const combinedList = tradesList.map((trade) => {
+            //    const matchingPrice = priceList.find(
+            //       (price) => price.blockNumber > trade.endBlock
+            //    );
+            //    console.log(matchingPrice, 'matching');
+            //    return {
+            //       ...trade,
+            //       price: matchingPrice
+            //          ? {
+            //               amount: matchingPrice.price.toString(),
+            //               blockNumber: matchingPrice.blockNumber,
+            //            }
+            //          : null,
+            //    };
+            // });
+
+            // Sort the combined list by endBlock
+            // combinedList.sort((a, b) => parseInt(a.endBlock) - parseInt(b.endBlock));
+
+            // Set trades and trade states
+
+            // console.log(combinedList, 'combined List');
+            setTrades(combinedList);
+            const initialTradeStates = combinedList.map((trade) => ({
+               isLong: trade.isLong,
                amount: '',
             }));
             setTradeStates(initialTradeStates);
+
+            // console.log(initialTradeStates, 'Combined list with prices');
          } catch (error) {
-            console.error('Error fetching trades:', error);
+            console.error('Error fetching trades and prices:', error);
          }
       };
 
-      fetchTrades();
+      fetchTradesAndPrices();
    }, []);
 
    function formatTimestamp(startBlock: number, endBlock: number): string {
@@ -65,22 +184,6 @@ const Events = () => {
       return `${hours}h ${minutes}m ${seconds}s`;
    }
 
-   const PoolsPrice = async (priceId: string) => {
-      const alchemyApiKey =
-         'https://eth-sepolia.g.alchemy.com/v2/k876etRLMsoIcTpTzkkTuh3LPBTK96YZ';
-      const provider = new ethers.JsonRpcProvider(alchemyApiKey);
-      console.log(provider);
-
-      const poolPriceInstance = new ethers.Contract(
-         priceOracleContractAddress,
-         priceOracleAbi,
-         provider
-      );
-
-      const poolPrice = await poolPriceInstance.pools(priceId);
-      console.log('Raw price from contract:', poolPrice.toString());
-   };
-
    useEffect(() => {
       const getOraclePrice = async () => {
          console.log('Hello oracle');
@@ -88,21 +191,21 @@ const Events = () => {
             const alchemyApiKey =
                'https://eth-sepolia.g.alchemy.com/v2/k876etRLMsoIcTpTzkkTuh3LPBTK96YZ';
             const provider = new ethers.JsonRpcProvider(alchemyApiKey);
-            console.log(provider);
+            // console.log(provider);
 
             const oracleInstance = new ethers.Contract(
                priceOracleContractAddress,
                priceOracleAbi,
                provider
             );
-            console.log(oracleInstance);
+            // console.log(oracleInstance);
 
             const price = await oracleInstance.getLatestPrice();
-            console.log('Raw price from contract:', price.toString());
+            // console.log('Raw price from contract:', price.toString());
 
             // Format the price (assuming it's in wei)
             const formattedPrice = ethers.formatUnits(price, 18);
-            console.log('Formatted price:', formattedPrice);
+            // console.log('Formatted price:', formattedPrice);
 
             setOraclePrice(formattedPrice);
          } catch (error) {
@@ -113,7 +216,7 @@ const Events = () => {
       getOraclePrice();
    }, []);
 
-   console.log(oraclePrice);
+   // console.log(oraclePrice);
 
    const handleDirectionChange = (index: number, direction: boolean) => {
       setTradeStates((prevStates) =>
@@ -130,35 +233,87 @@ const Events = () => {
          )
       );
    };
+
+   const getProviderAndSigner = async () => {
+      if (!window.ethereum) {
+         console.error('No Ethereum provider detected');
+         return { provider: null, signer: null };
+      }
+
+      // Cast window.ethereum as unknown first, then to ethers.Eip1193Provider
+      const provider = new ethers.BrowserProvider(
+         (window.ethereum as unknown) as ethers.Eip1193Provider
+      );
+
+      try {
+         const signer = await provider.getSigner();
+         return { provider, signer };
+      } catch (error) {
+         console.error('Failed to connect to wallet:', error);
+         return { provider: null, signer: null };
+      }
+   };
+
    const OpenPosition = async (poolId: string, index: number) => {
       const { isLong, amount } = tradeStates[index];
       try {
-         const provider = new ethers.JsonRpcProvider(
-            'https://eth-sepolia.g.alchemy.com/v2/k876etRLMsoIcTpTzkkTuh3LPBTK96YZ'
-         );
-
          const minShares = 0;
          const amountInWei = ethers.parseUnits(amount, 18);
          console.log({ poolId, isLong, amountInWei, minShares });
 
-         // const tx = await positionContract.openPosition(
-         //    poolId,
-         //    isLong,
-         //    amountInWei,
-         //    minShares
-         // );
-         // await tx.wait();
-         // console.log('Position opened successfully:', tx);
+         const { provider, signer } = await getProviderAndSigner();
+
+         // Connect to the contract using the signer
+         const positionContract = new ethers.Contract(
+            openPositionContractAddress,
+            openPositionAbi,
+            signer
+         );
+
+         const valueAmount = amount.toString();
+
+         const tx = await positionContract.openPosition(
+            poolId,
+            isLong,
+            amountInWei,
+            minShares,
+            {
+               // value: amount.toString(),
+               value: valueAmount,
+               gasPrice: ethers.parseUnits('1', 'gwei'),
+               gasLimit: 200000,
+            }
+         );
+         await tx.wait();
+         console.log('Position opened successfully:', tx);
       } catch (error) {
          console.error('Failed to open position:', error);
       }
    };
+
+   useEffect(() => {
+      async function fetchData() {
+         try {
+            const response = await fetch('/api/pools-prices');
+            const result = await response.json();
+            console.log(result, 'POOLS AND PRICES');
+            setData(result);
+         } catch (error) {
+            console.error('Error fetching data:', error);
+            //   setData(null);
+         }
+      }
+
+      fetchData();
+   }, []);
+
    return (
       <div className="mt-8">
          <div className="max-w-5xl flex mx-auto space-x-8 p-4">
-            {trades.map((trade, index) => (
+            {/* {trades.map((trade, index) => ( */}
+            {data?.items?.map((trade, index) => (
                <div
-                  key={index}
+                  key={trade.poolId}
                   className="w-full p-4 px-5 rounded-3xl shadow-xl bg-gradient-to-b from-[#f87b7a] via-red-100 to-red-50"
                >
                   <div className="">
@@ -212,8 +367,10 @@ const Events = () => {
                            <div>
                               <div className="space-x-3 pb-1">
                                  <span>Entry Price</span>
+
+                                 {/* <p>{trade.price.toString()}</p> */}
+                                 <p>{ethers.formatUnits(trade.price, 18)}</p>
                               </div>
-                              {/* <p>{trade.entryPrice}</p> */}
                               {/* <p>${ PoolsPrice(trade.poolId)}</p> */}
                            </div>
                         </div>
